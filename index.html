@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clínica Cherniauskas Morikawa</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="header-content">
+            <div class="logo">
+                <span class="material-icons">view_kanban</span>
+                <h1>Clínica Cherniauskas Morikawa</h1>
+            </div>
+            <div class="header-actions">
+                <input type="file" id="import-file" accept=".json" style="display: none;">
+                <button id="import-btn" class="secondary-btn" title="Importar backup de tarefas">
+                    <span class="material-icons">upload_file</span>
+                    Importar
+                </button>
+                <button id="export-btn" class="secondary-btn" title="Salvar backup das tarefas no computador">
+                    <span class="material-icons">save</span>
+                    Salvar Backup
+                </button>
+                <button id="add-task-btn" class="primary-btn">
+                    <span class="material-icons">add</span>
+                    Nova Tarefa
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="board">
+        <div class="add-column-container">
+            <button id="add-column-btn" class="secondary-btn">
+                <span class="material-icons">add</span>
+                Nova Coluna
+            </button>
+        </div>
+    </main>
+
+    <!-- Modal para Nova Tarefa -->
+    <div id="task-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-title">Nova Tarefa</h2>
+                <button class="close-btn"><span class="material-icons">close</span></button>
+            </div>
+            <form id="task-form">
+                <div class="form-group">
+                    <label for="task-title">Título</label>
+                    <input type="text" id="task-title" required placeholder="Digite o título da tarefa...">
+                </div>
+                <div class="form-group">
+                    <label for="task-desc">Descrição</label>
+                    <textarea id="task-desc" rows="3" placeholder="Detalhes adicionais (opcional)"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="secondary-btn cancel-btn">Cancelar</button>
+                    <button type="submit" class="primary-btn">Salvar Tarefa</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script type="module" src="main.js"></script>
+</body>
+
+</html>
