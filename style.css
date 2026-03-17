@@ -466,3 +466,9 @@ header {
         /* Always show actions on touch devices */
     }
 }
+
+.task-card.touch-pressing {
+    transform: scale(0.98);
+    opacity: 0.8;
+    transition: transform 0.2s, opacity 0.2s;
+}
