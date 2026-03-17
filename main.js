@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+import { getFirestore, doc, setDoc, onSnapshot, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyC62tP9qUt9bYyE9PBTUFXGOIHaEU1h8zI",
@@ -13,6 +13,16 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+
+// Ativar o cache local offline do Firebase
+enableIndexedDbPersistence(db).catch((err) => {
+    if (err.code == 'failed-precondition') {
+        console.warn("Múltiplas abas abertas. Cache offline funciona apenas em uma aba por vez.");
+    } else if (err.code == 'unimplemented') {
+        console.warn("Navegador não suporta cache offline do Firebase.");
+    }
+});
+
 const boardDocRef = doc(db, 'board', 'main');
 
 let tasks = [];
@@ -89,6 +99,16 @@ const descInput = document.getElementById('task-desc');
 // Variables
 let draggedTask = null;
 let currentEditId = null;
+
+// Touch Drag Variables
+let touchTimer = null;
+let isDraggingTouch = false;
+let touchoffsetX = 0;
+let touchoffsetY = 0;
+let cloneEl = null;
+let currentDropZone = null;
+let touchStartX = 0;
+let touchStartY = 0;
 
 // Initialize App
 function init() {
@@ -203,6 +223,11 @@ function createTaskElement(task) {
     el.addEventListener('dragstart', handleDragStart);
     el.addEventListener('dragend', handleDragEnd);
 
+    // Touch events for mobile
+    el.addEventListener('touchstart', handleTouchStart, { passive: true });
+    el.addEventListener('touchmove', handleTouchMove, { passive: true });
+    el.addEventListener('touchend', handleTouchEnd, { passive: true });
+
     // Click events for edit/delete
     el.querySelector('.edit-btn').addEventListener('click', () => openModal(task));
     el.querySelector('.delete-btn').addEventListener('click', () => deleteTask(task.id));
@@ -222,6 +247,135 @@ function handleDragEnd() {
     this.classList.remove('dragging');
     draggedTask = null;
     document.querySelectorAll('.column').forEach(col => col.classList.remove('drag-over'));
+}
+
+// Touch Drag & Drop Handlers
+function handleTouchStart(e) {
+    if (e.target.closest('button')) return; // Ignore buttons
+    
+    const touch = e.touches[0];
+    touchStartX = touch.clientX;
+    touchStartY = touch.clientY;
+    
+    const taskEl = this;
+    
+    touchTimer = setTimeout(() => {
+        isDraggingTouch = true;
+        startTouchDrag(taskEl, touchStartX, touchStartY);
+    }, 400); // 400ms long press to drag
+    
+    taskEl.classList.add('touch-pressing'); 
+}
+
+function handleTouchMove(e) {
+    if (!isDraggingTouch && touchTimer) {
+        // Cancel long press if moved
+        const touch = e.touches[0];
+        if (Math.abs(touch.clientX - touchStartX) > 10 || Math.abs(touch.clientY - touchStartY) > 10) {
+            clearTimeout(touchTimer);
+            touchTimer = null;
+            this.classList.remove('touch-pressing');
+        }
+    }
+}
+
+function handleTouchEnd(e) {
+    if (touchTimer) {
+        clearTimeout(touchTimer);
+        touchTimer = null;
+    }
+    this.classList.remove('touch-pressing');
+}
+
+function startTouchDrag(element, initialX, initialY) {
+    element.classList.remove('touch-pressing');
+    draggedTask = element;
+    const rect = element.getBoundingClientRect();
+    
+    touchoffsetX = initialX - rect.left;
+    touchoffsetY = initialY - rect.top;
+
+    cloneEl = element.cloneNode(true);
+    cloneEl.classList.add('dragging-clone');
+    cloneEl.style.position = 'fixed';
+    cloneEl.style.left = initialX - touchoffsetX + 'px';
+    cloneEl.style.top = initialY - touchoffsetY + 'px';
+    cloneEl.style.width = rect.width + 'px';
+    cloneEl.style.height = rect.height + 'px';
+    cloneEl.style.zIndex = '1000';
+    cloneEl.style.pointerEvents = 'none';
+    cloneEl.style.opacity = '0.9';
+    cloneEl.style.transform = 'rotate(3deg) scale(1.05)';
+    cloneEl.style.transition = 'transform 0.1s';
+    cloneEl.style.boxShadow = '0 10px 20px rgba(0,0,0,0.3)';
+    
+    document.body.appendChild(cloneEl);
+    
+    element.classList.add('dragging'); 
+    element.style.opacity = '0.3';
+
+    document.addEventListener('touchmove', handleDocumentTouchMove, { passive: false });
+    document.addEventListener('touchend', handleDocumentTouchEnd);
+}
+
+function handleDocumentTouchMove(e) {
+    if (!isDraggingTouch || !cloneEl) return;
+    
+    e.preventDefault(); // Stop scrolling while dragging
+    
+    const touch = e.touches[0];
+    cloneEl.style.left = touch.clientX - touchoffsetX + 'px';
+    cloneEl.style.top = touch.clientY - touchoffsetY + 'px';
+
+    const target = document.elementFromPoint(touch.clientX, touch.clientY);
+    const col = target ? target.closest('.column') : null;
+    
+    document.querySelectorAll('.column').forEach(c => c.classList.remove('drag-over'));
+    
+    if (col) {
+        col.classList.add('drag-over');
+        currentDropZone = col;
+        
+        const taskList = col.querySelector('.task-list');
+        const afterElement = getDragAfterElement(taskList, touch.clientY);
+        
+        if (afterElement == null) {
+            taskList.appendChild(draggedTask);
+        } else {
+            taskList.insertBefore(draggedTask, afterElement);
+        }
+    } else {
+        currentDropZone = null;
+    }
+}
+
+function handleDocumentTouchEnd(e) {
+    if (!isDraggingTouch) return;
+    isDraggingTouch = false;
+    
+    document.removeEventListener('touchmove', handleDocumentTouchMove);
+    document.removeEventListener('touchend', handleDocumentTouchEnd);
+    
+    if (cloneEl) {
+        cloneEl.remove();
+        cloneEl = null;
+    }
+    
+    if (draggedTask) {
+        draggedTask.style.opacity = '';
+        draggedTask.classList.remove('dragging');
+        
+        document.querySelectorAll('.column').forEach(c => c.classList.remove('drag-over'));
+        
+        if (currentDropZone) {
+            const newStatus = currentDropZone.dataset.status;
+            const taskList = currentDropZone.querySelector('.task-list');
+            moveTaskOrder(draggedTask.dataset.id, newStatus, taskList);
+        }
+        
+        draggedTask = null;
+    }
+    currentDropZone = null;
 }
 
 // Column Event Listeners setup
@@ -531,3 +685,4 @@ importFile.addEventListener('change', (event) => {
 
     reader.readAsText(file);
 });
+
